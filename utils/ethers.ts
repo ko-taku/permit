@@ -31,6 +31,11 @@ export const ownerBalance = async () => {
 export const getBalance = async (address: string) => {
   try {
     // Todo: getBalance는 인자로 받는 address의 잔액을 리턴해야 합니다.(balanceOf)
+    const balanceWei = await contractByOwner.balanceOf(address);
+    const balanceEth = ethers.formatUnits(balanceWei, 18);
+    console.log('Type of balanceWei:', typeof balanceWei);
+    console.log('Type of balanceETH:', typeof balanceEth);
+    return balanceWei;
   } catch (error) {
     console.error('Error in getBalance:', error);
   }
@@ -39,6 +44,7 @@ export const getBalance = async (address: string) => {
 export const getAllowance = async (owner: string, spender: string) => {
   try {
     // Todo: getAllowance는 인자로 들어오는 owner가 spender에게 허용한 금액을 리턴해야 합니다.(allowance)
+    return await contractByOwner.allowance(owner, spender);
   } catch (error) {
     console.error('Error in allowance:', error);
   }
@@ -51,6 +57,57 @@ export const permit = async () => {
         permit 함수는 [domain], [types], [message]를 정의하여 가스 대납자의 시점(contractBySpender)에서 permit을 실행합니다.
         owner가 가진 전체 Balance를 spender에게 permit 시킵니다.
     */
+    const ownerBalance = await getBalance(owner.address);
+    const deadline = Math.floor(Date.now() / 1000) + 1800;
+    const nonce = await contractByOwner.nonces(owner.address);
+
+    const domain = {
+      name: 'MyGasslessToken',
+      version: '1',
+      chainId: (await provider.getNetwork()).chainId,
+      verifyingContract: contractAddress,
+    };
+    const types = {
+      Permit: [
+        { name: 'owner', type: 'address' },
+        { name: 'spender', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'deadline', type: 'uint256' },
+      ],
+    };
+
+    const message = {
+      owner: owner.address,
+      spender: spender.address,
+      value: ownerBalance,
+      nonce: nonce,
+      deadline: deadline,
+    };
+
+    const signature = await owner.signTypedData(domain, types, message);
+
+    const recoverAddress = ethers.verifyTypedData(
+      domain,
+      types,
+      message,
+      signature
+    ); //signature 전체를 이용해서 주소 복원만 해주는 high-level 함수
+
+    const { v, r, s } = ethers.Signature.from(signature);
+    //signature를 분석해서 v, r, s 값을 분해할 때 사용
+
+    const permit = await contractBySpender.permit(
+      message.owner,
+      message.spender,
+      message.value,
+      message.deadline,
+      v,
+      r,
+      s
+    );
+    await permit.wait();
+
   } catch (error) {
     console.error('Error in permit:', error);
   }
@@ -59,6 +116,8 @@ export const permit = async () => {
 export const tranferFrom = async (from: string, to: string, value: bigint) => {
   try {
     // Todo: from이 to에게 value만큼 가스 대납자의 시점(contractBySpender)에서 transferFrom을 실행합니다.
+    const transferFrom = await contractBySpender.transferFrom(from, to, value);
+    transferFrom.wait();
   } catch (error) {
     console.error('Error in tranferFrom:', error);
   }
