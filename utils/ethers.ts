@@ -97,7 +97,7 @@ export const permit = async () => {
     if (recoverAddress !== owner.address) {
       throw new Error("서명자가 owner가 아닙니다!");
     }
-    //owner의 주소값과 비교하여 서명자가 맞는지 확인
+    //owner의 주소값과 비교하여 서명자가 맞는지 확인 추가
 
     const { v, r, s } = ethers.Signature.from(signature);
     //signature를 분석해서 v, r, s 값을 분해할 때 사용
